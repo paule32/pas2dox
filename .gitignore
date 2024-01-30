@@ -1,0 +1,13 @@
+#
+pas2dox.exe
+pas2dox.upx.exe
+pas2dox.log
+pas2dox.o
+test.pas.cpp
+test.pas
+pas2dox.cpp
+pas2dox.cpp
+libasmjit.a
+pas2dox.cpp
+libdwarf64.a
+dwarf.o
