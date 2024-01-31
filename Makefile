@@ -14,6 +14,13 @@ XX=g++ $(FLAGSXX)
 FLAGSXX= -m64 -O2 -fPIC -std=c++17  \
     -DGETTEXT_DOMAIN=\"pas2dox\"    \
                                     \
+    -Wno-pmf-conversions            \
+    -Wno-deprecated                 \
+    -Wno-register                   \
+    -Wno-volatile                   \
+    -Wno-write-strings              \
+    -Wno-invalid-offsetof           \
+                                    \
     -D__MINGW32__                   \
     -D__MINGW64__                   \
                                     \
@@ -32,6 +39,8 @@ FLAGSXX= -m64 -O2 -fPIC -std=c++17  \
                                     \
     -Wno-write-strings              \
     -I/E/msys64/mingw64/usr/include \
+    -I/E/Projekte/tvision/include/tvision/compat/borland \
+    -I/E/Projekte/tvision/include   \
     -I/E/Projekte/plog/include      \
     -I/E/Projekte/boost             \
     -I/E/Projekte/asmjit/src/asmjit \
@@ -57,29 +66,34 @@ INSTALL_DIR=/usr/local/bin/
 pas2dox.exe: libasmjit.a  pas2dox.cpp
 	$(XX) -o pas2dox.o -c pas2dox.cpp
 	${XX} -o pas2dox.exe  pas2dox.o \
-	-L./                            \
-	-lz                             \
-	-lasmjit                        \
-	-lintl                          \
-	-ldwarf64                       \
-	                                \
-	-lboost_system-mt               \
-	-lboost_thread-mt               \
-	-lboost_program_options-mt      \
-	-lboost_date_time-mt            \
-	-lboost_regex-mt                \
-	                                \
-	-static-libgcc                  \
-	-static-libstdc++
+    TSyntaxFileEditor.o             \
+    -L./                            \
+    -lz                             \
+    -lasmjit                        \
+    -ltvision                       \
+    -lintl                          \
+    -ldwarf64                       \
+                                    \
+    -lboost_system-mt               \
+    -lboost_thread-mt               \
+    -lboost_program_options-mt      \
+    -lboost_date_time-mt            \
+    -lboost_regex-mt                \
+                                    \
+    -static-libgcc                  \
+    -static-libstdc++
 	
 	strip ./pas2dox.exe
 	cp    ./pas2dox.exe ./pas2dox.upx.exe
 	upx                 ./pas2dox.upx.exe
 
+TSyntaxFileEditor.o: TSyntaxFileEditor.cc TSyntaxFileEditor.h
+	$(XX) -o TSyntaxFileEditor.o -c TSyntaxFileEditor.cc
+
 dwarf.o: dwarf.c
 	$(CC) -o dwarf.o -c dwarf.c
 
-pas2dox.cpp: dwarf.o pas2dox.l
+pas2dox.cpp: dwarf.o TSyntaxFileEditor.o pas2dox.l
 	flex -i -o pas2dox.cpp pas2dox.l
 
 .PHONY : clean

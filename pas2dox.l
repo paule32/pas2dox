@@ -153,6 +153,53 @@ FILE * OUTPUT  = NULL;
 FILE * logFile = NULL;              // todo: assembly output
 
 // ---------------------------------------------------------------------------
+// BORLAND TurboVision - Pascal like Text User Interface (TUI) ...
+// ---------------------------------------------------------------------------
+# define Uses_TApplication
+# define Uses_TEvent
+# define Uses_TRect
+# define Uses_TDialog
+# define Uses_TStaticText
+# define Uses_TKeys
+# define Uses_TInputLine
+# define Uses_TCheckBoxes
+# define Uses_TLabel
+# define Uses_THistory
+# define Uses_TButton
+# define Uses_TSItem
+# define Uses_TMenuBar
+# define Uses_TSubMenu
+# define Uses_TMenuItem
+# define Uses_TStatusLine
+# define Uses_TStatusItem
+# define Uses_TStatusDef
+# define Uses_TDeskTop
+# define Uses_TChDirDialog
+# define Uses_TFileDialog
+# define Uses_MsgBox
+# define Uses_TDisplay
+# define Uses_TScreen
+# define Uses_TEditor
+# define Uses_TEditWindow
+# define Uses_TMemo
+# define Uses_TStreamableClass
+# define Uses_fpstream
+
+# include <strstrea.h>
+# include <iomanip.h>
+
+# include <tvision/tv.h>
+
+# include "formcmds.h"
+# include "tvcmds.h"
+# include "TSyntaxFileEditor.h"
+
+extern void TurboMain(int,char**);
+
+extern ushort doEditDialog( int dialog, ... );
+extern ushort execDialog( TDialog *d, void *data );
+
+// ---------------------------------------------------------------------------
 // sanity check of some (pre) defined macros ...
 // ---------------------------------------------------------------------------
 #ifndef  EXIT_FAILURE
@@ -188,7 +235,8 @@ constexpr std::string_view SE_syntax_keyword      = "uses is a keyword, and can 
 constexpr std::string_view SE_syntax_expect_semi  = "expect ;";
 constexpr std::string_view SE_syntax_expect_comma = "expect ,";
 
-bool g_bDebugMode     = false;      /// In Debug Mode
+bool g_bDebugMode          = false;    /// In Debug Mode
+bool g_bTextUserInterface  = false;    /// Text User Interface - tui
 
 // ---------------------------------------------------------------------------
 // transpiller mode throw ...
@@ -245,6 +293,331 @@ void init_asmjit()
     rt.cpuFeatures () );
 
     x86::Compiler cc(&code);  // Create and attach x86::Compiler to code.
+}
+
+typedef char *_charPtr;
+typedef TPoint *PPoint;
+
+TDialog *createFindDialog()
+{
+    TDialog *d = new TDialog( TRect( 0, 0, 38, 12 ), "Find" );
+
+    d->options |= ofCentered;
+
+    TInputLine *control = new TInputLine( TRect( 3, 3, 32, 4 ), 80 );
+    d->insert( control );
+    
+    d->insert(new TLabel( TRect( 2, 2, 15, 3 ), gettext("~T~ext to find"), control ) );
+    d->insert(new THistory( TRect( 32, 3, 35, 4 ), control, 10 ) );
+
+    d->insert(new TCheckBoxes( TRect( 3, 5, 35, 7 ),
+        new TSItem( gettext("~C~ase sensitive"),
+        new TSItem( "~W~hole words only", 0 ))));
+
+    d->insert(new TButton( TRect( 14, 9, 24, 11 ), "O~K~", cmOK, bfDefault ) );
+    d->insert(new TButton( TRect( 26, 9, 36, 11 ), gettext("Cancel"), cmCancel, bfNormal ) );
+
+    d->selectNext( False );
+    return d;
+}
+
+TDialog *createReplaceDialog()
+{
+    TDialog *d = new TDialog( TRect( 0, 0, 40, 16 ), gettext("Replace") );
+
+    d->options |= ofCentered;
+
+    TInputLine *control = new TInputLine( TRect( 3, 3, 34, 4 ), 80 );
+    d->insert( control );
+    d->insert(
+        new TLabel( TRect( 2, 2, 15, 3 ), gettext("~T~ext to find"), control ) );
+    d->insert( new THistory( TRect( 34, 3, 37, 4 ), control, 10 ) );
+
+    control = new TInputLine( TRect( 3, 6, 34, 7 ), 80 );
+    d->insert( control );
+    d->insert( new TLabel( TRect( 2, 5, 12, 6 ), gettext("~N~ew text"), control ) );
+    d->insert( new THistory( TRect( 34, 6, 37, 7 ), control, 11 ) );
+
+    d->insert( new TCheckBoxes( TRect( 3, 8, 37, 12 ),
+        new TSItem(gettext("~C~ase sensitive"),
+        new TSItem("~W~hole words only",
+        new TSItem(gettext("~P~rompt on replace"),
+        new TSItem(gettext("~R~eplace all"), 0 ))))));
+
+    d->insert( new TButton( TRect( 17, 13, 27, 15 ), "O~K~", cmOK, bfDefault ) );
+    d->insert( new TButton( TRect( 28, 13, 38, 15 ),
+                            gettext("Cancel"), cmCancel, bfNormal ) );
+    d->selectNext( False );
+    return d;
+}
+
+class TMyWindow : public TDialog {
+public:
+    class MyEditorChild: public TSyntaxFileEditor {
+    public:
+        MyEditorChild(
+            TMyWindow  * parent,
+            const TRect& bounds,
+            TScrollBar * hScrollBar,
+            TScrollBar * vScrollBar,
+            TIndicator * indicator,
+            TStringView  filename):
+            TSyntaxFileEditor( bounds,hScrollBar,vScrollBar,indicator,filename),
+            owner(parent) {
+            
+            EditorTextColor    = 0x17;
+            EditorCommentColor = 0x40;
+        }
+        // -------------------------------
+        // event handler ...
+        // -------------------------------
+        void handleEvent( TEvent &event )
+        {
+            TSyntaxFileEditor::handleEvent( event );
+            if (event.what == evKeyDown) {
+                if (event.keyDown.charScan.charCode == kbEsc)     // #27 - Escape
+                {
+                    owner->close();
+                    clearEvent(event);
+                    return;
+                }   else
+                if (event.keyDown.keyCode == kbF1)  // F1
+                {
+                    clearEvent(event);
+                    messageBox("getkey F1",mfInformation|mfOKButton);
+                    return;
+                }   else
+                if (event.keyDown.keyCode == kbF2)  // F2
+                {
+                    clearEvent(event);
+                    messageBox("getkey F2",mfInformation|mfOKButton);
+                    return;
+                }
+            }   else
+            if (event.what == evCommand) {
+                if (event.message.command == 9)      // F1  - Function key
+                {
+                    clearEvent(event);
+                    messageBox("getkey Help",mfInformation|mfOKButton);
+                    return;
+                }
+            }
+        }
+
+    private:
+        TMyWindow * owner;
+    };
+
+    ~TMyWindow() {
+    }
+    TMyWindow(const TRect& bounds, const char* filename):
+        TWindowInit(&TMyWindow::initFrame),
+        TDialog(bounds, "Mein Fenster") {
+        palette = dpBlueDialog;
+
+        insert(hScrollBar = new TScrollBar( TRect( 18, size.y - 1, size.x - 23, size.y     ) ));
+        insert(vScrollBar = new TScrollBar( TRect( size.x - 23, 1, size.x - 22, size.y - 1 ) ));
+        insert(indicator  = new TIndicator( TRect(  2, size.y - 1,          16, size.y     ) ));
+        
+        insert(editor = new MyEditorChild(this,
+            TRect(1, 1, size.x - 24, size.y - 1),
+            hScrollBar,
+            vScrollBar,
+            indicator,
+            "www.txt"));
+
+        insert(button1 = new TButton(TRect(size.x - 21, 2, size.x - 3, 4), "Start",   cmButton1, bfNormal));
+        insert(button2 = new TButton(TRect(size.x - 21, 5, size.x - 3, 7), "Compile", cmButton2, bfNormal));
+        
+        options   |= ofSelectable;
+        eventMask |= evBroadcast; // for get word under cursor
+        
+        drawView();
+    }
+    // -------------------------------
+    // event handler ...
+    // -------------------------------
+    void handleEvent(TEvent & event ){
+        TWindow::handleEvent( event );
+        if (event.what == evCommand) {
+            switch (event.message.command) {
+                case cmClose:
+                    close();
+                    clearEvent(event);
+                    break;
+                case cmButton1:
+                    // Aktion fur Schaltflache 1
+                    break;
+                case cmButton2:
+                    // Aktion fur Schaltflache 2
+                    break;
+            }
+        }
+    }
+
+private:
+    MyEditorChild * editor;
+    TIndicator    * indicator;
+    
+    TScrollBar    * vScrollBar;
+    TScrollBar    * hScrollBar;
+    
+    TButton       * button1;
+    TButton       * button2;
+};
+
+// ---------------------------------------------------------------------------
+// Turbo Pascal Application class ...
+// ---------------------------------------------------------------------------
+class TFormApp : public TApplication
+{
+public:
+
+    TFormApp();
+
+    void handleEvent( TEvent& Event);
+    static TMenuBar *initMenuBar( TRect r);
+    static TStatusLine *initStatusLine( TRect r);
+    void changeDir();
+
+    TMyWindow * openEditor( const char * fileName );
+    
+    void fileNew();
+    void fileOpen();
+private:
+    TMyWindow * editor;
+};
+
+TMyWindow *
+TFormApp::openEditor( const char * fileName )
+{
+    TRect  r = deskTop->getExtent();
+    TMyWindow *editor = (TMyWindow *) validView( new TMyWindow(r, fileName));
+
+    if (editor != nullptr) {
+      //editor->helpCtx = hcCalendar;
+        deskTop->insert( editor );
+    }
+    return (TMyWindow *)editor;
+}
+
+void TFormApp::fileOpen()
+{
+    char fileName[MAXPATH];
+    strcpy( fileName, "*.*" );
+
+    if( execDialog( new TFileDialog( "*.*", "Open file",
+            "~N~ame", fdOpenButton, 100 ), fileName) != cmCancel )
+    openEditor(fileName);
+}
+
+void TFormApp::fileNew()
+{
+    openEditor( 0 );
+}
+
+// TFormApp
+TFormApp::TFormApp() :
+    TProgInit(&TFormApp::initStatusLine,
+              &TFormApp::initMenuBar,
+              &TFormApp::initDeskTop),
+    TApplication()
+{
+    TEvent event;
+    TEditor::editorDialog = doEditDialog;
+
+    // Display about box
+    event.what = evCommand;
+    event.message.command = cmAboutBox;
+    putEvent(event);
+}
+
+void TFormApp::changeDir()
+{
+    TView *d = validView( new TChDirDialog( 0, hlChangeDir ) );
+
+    if( d != 0 ) {
+        deskTop->execView( d );
+        destroy(d);
+    }
+}
+
+void TFormApp::handleEvent(TEvent& event)
+{
+    int newMode;
+    char aboutMsg[80];
+
+    TApplication::handleEvent(event);
+    if (event.what == evCommand) {
+        switch (event.message.command) {
+        case cmListOpen:
+            fileOpen();
+            break;
+        case cmChgDir:
+            changeDir();
+            break;
+        case cmAboutBox:
+            strcpy(aboutMsg, "\x3Turbo Vision AsmJit 1.0\n\n\x3non-profit Project");
+            messageBox(aboutMsg, mfInformation | mfOKButton);
+            break;
+
+        default:
+            return;
+        }
+        clearEvent(event);
+    }
+}
+
+TMenuBar *TFormApp::initMenuBar( TRect r)
+{
+    r.b.y = r.a.y + 1;
+    return new TMenuBar(r,
+        * new TSubMenu( "~\xF0~", hcNoContext ) +
+            * new TMenuItem( "~A~bout...", cmAboutBox, kbNoKey, hcNoContext ) +
+
+        * new TSubMenu( "~F~ile", hcNoContext) +
+            * new TMenuItem( "~O~pen...", cmListOpen, kbF3, hcNoContext, "F3" ) +
+            * new TMenuItem( "~S~ave"   , cmListSave, kbF2, hcNoContext, "F2" ) +
+              newLine() +
+            * new TMenuItem( "~C~hange directory...", cmChgDir  , kbNoKey, hcNoContext ) +
+            * new TMenuItem( "~D~OS shell"          , cmDosShell, kbNoKey, hcNoContext ) +
+            * new TMenuItem( "E~x~it"               , cmQuit    , kbAltX , hcNoContext, "Alt-X"  ) +
+
+        * new TSubMenu( "~W~indow", hcNoContext ) +
+            * new TMenuItem( "~M~ove" , cmResize, kbCtrlF5 , hcNoContext, "Cntl-F5"  ) +
+            * new TMenuItem( "~N~ext" , cmNext  , kbF6     , hcNoContext, "F6"       ) +
+            * new TMenuItem( "~P~rev" , cmPrev  , kbShiftF6, hcNoContext, "Shift-F6" ) +
+            * new TMenuItem( "~C~lose", cmClose , kbAltF3  , hcNoContext, "Alt-F3"   )
+    );
+}
+TStatusLine *
+TFormApp::initStatusLine( TRect r )
+{
+    r.a.y = r.b.y - 1;
+    return new TStatusLine( r,
+        * new TStatusDef( 0, 0xFFFF ) +
+            * new TStatusItem( "~F2~ Save" , kbF2 , cmListSave ) +
+            * new TStatusItem( "~F3~ Open" , kbF3 , cmListOpen ) +
+            * new TStatusItem( "~F10~ Menu", kbF10, cmMenu     ) +
+
+        * new TStatusItem( 0 , kbShiftDel, cmCut    ) +
+        * new TStatusItem( 0 , kbCtrlIns , cmCopy   ) +
+        * new TStatusItem( 0 , kbShiftIns, cmPaste  ) +
+        * new TStatusItem( "", kbCtrlF5  , cmResize )
+    );
+}
+
+// ------------------------------------------------------------------
+// TV entry point for the text user interface ...
+// ------------------------------------------------------------------
+void TurboMain(int argc, char **argv)
+{
+    TFormApp *demoProgram = new TFormApp();
+    TEditor::editorDialog = doEditDialog;
+    
+    demoProgram->run();
+    
+    TObject::destroy( demoProgram );
 }
 
 // ---------------------------------------------------------------------------
@@ -3851,6 +4224,144 @@ void handle_locale()
     textdomain             ( GETTEXT_DOMAIN );
 }
 
+ushort execDialog( TDialog *d, void *data )
+{
+    TView *p = TProgram::application->validView( d );
+
+    if( p == 0 )
+    return cmCancel;
+
+    else {
+        if( data != 0 )
+        p->setData( data );
+    
+        ushort result = TProgram::deskTop->execView( p );
+        
+        if( result != cmCancel && data != 0 )
+        p->getData( data );
+    
+        TObject::destroy( p );
+        return result;
+    }
+}
+
+ushort doEditDialog( int dialog, ... )
+{
+    va_list arg;
+    char buf[256] = {0};
+    
+    ostrstream os( buf, sizeof( buf )-1 );
+    switch( dialog )
+    {
+        case edOutOfMemory:
+        return messageBox(
+            gettext("Not enough memory for this operation"),
+            mfError | mfOKButton );
+            
+        case edReadError: {
+        va_start( arg, dialog );
+            os << gettext("Error reading file ")
+               << va_arg( arg, _charPtr )
+               << "."
+               << ends;
+        va_end( arg );
+        return messageBox(
+            buf,
+            mfError | mfOKButton );
+        }
+        case edWriteError: {
+        va_start( arg, dialog );
+            os << gettext("Error writing file ") << va_arg( arg,_charPtr )
+               << "."
+               << ends;
+        va_end( arg );
+        return messageBox(
+            buf,
+            mfError | mfOKButton );
+        }
+        case edCreateError: {
+        va_start( arg, dialog );
+        os  << gettext("Error creating file ")
+            << va_arg( arg, _charPtr )
+            << "."
+            << ends;
+        va_end( arg );
+        return messageBox(
+        buf,
+        mfError | mfOKButton );
+        }
+        case edSaveModify: {
+        va_start( arg, dialog );
+          os << va_arg( arg, _charPtr )
+             << gettext(" has been modified. Save?")
+             << ends;
+        va_end( arg );
+        return messageBox(
+            buf,
+            mfInformation | mfYesNoCancel );
+        }
+        case edSaveUntitled:
+        return messageBox( gettext("Save untitled file?"),
+                           mfInformation | mfYesNoCancel );
+        case edSaveAs: {
+        va_start( arg, dialog );
+            return execDialog(
+            new TFileDialog( "*.*",
+                gettext("Save file as"),
+                "~N~ame",
+                fdOKButton,
+                101 ),
+        va_arg( arg, _charPtr ) );
+        }
+
+        case edFind: {
+        va_start( arg, dialog );
+        return execDialog(
+            createFindDialog(),
+            va_arg( arg, _charPtr ) );
+        }
+
+        case edSearchFailed:
+        return messageBox(
+            gettext("Search string not found."),
+            mfError | mfOKButton );
+            
+        case edReplace: {
+        va_start( arg, dialog );
+        return execDialog(
+            createReplaceDialog(),
+            va_arg( arg, _charPtr ) );
+        }
+
+        case edReplacePrompt: {
+        //  Avoid placing the dialog on the same line as the cursor
+        TRect r( 0, 1, 40, 8 );
+        r.move( (  TProgram::deskTop->size.x-r.b.x)/2, 0 );
+        TPoint t = TProgram::deskTop->makeGlobal( r.b );
+        t.y++;
+        
+        va_start( arg, dialog );
+            TPoint *pt = va_arg( arg, PPoint );
+            if( pt->y <= t.y )
+            r.move( 0, TProgram::deskTop->size.y - r.b.y - 2 );
+        va_end( arg );
+        
+        return messageBoxRect(
+            r, gettext("Replace this occurence?"),
+            mfYesNoCancel | mfInformation );
+        }
+    }
+    return cmCancel;
+}
+
+// ---------------------------------------------------------------------------
+// starting Turbo Pascal text user interface ...
+// ---------------------------------------------------------------------------
+void g_pTextUserInterface(int argc, char **argv)
+{
+    TurboMain(argc, argv);
+}
+
 // ---------------------------------------------------------------------------
 // clean-up the workspace ...
 // ---------------------------------------------------------------------------
@@ -3858,7 +4369,6 @@ void cleanup()
 {
     fclose( yyout );
     fclose( yyin  );
-    
     
     exit( g_bExitCode );
 }
@@ -3940,7 +4450,8 @@ int main (int argc, char** argv)
         ("cvt-body,b"  , "convert body")
         ("genss,s"     , "generate \\ss clause")
         ("namespace,n" , "namespace")
-        ("noimpl,m"    , "ignore implementation");
+        ("noimpl,m"    , "ignore implementation")
+        ("tui,t"       , "TUI - text user interface");
 
     options_description output_long("Output Options (long)");
         output_long.add_options()
@@ -3970,7 +4481,7 @@ int main (int argc, char** argv)
     // ----------------------------
     if (vm.count("help")) {
         cout << allOptions << endl;
-        throw EP_Exception_ExitHelp("");
+        return (g_bExitCode = EXIT_SUCCESS);
     }   else
 
     if (vm.count("debug"))      { g_bDebugMode            = true ; } else
@@ -3980,6 +4491,7 @@ int main (int argc, char** argv)
     if (vm.count("cvt-body"))   { g_bConvertBody          = true ; } else
     if (vm.count("gensa"))      { g_bGenerateSa           = false; } else
     if (vm.count("namespace"))  { g_bNamespace            = true ; } else
+    if (vm.count("tui"))        { g_bTextUserInterface    = true ; } else
     if (vm.count("ignoreimpl")) { g_bIgnoreImplementation = true ; } else {
 
         if (!OUTPUT) {
@@ -3995,8 +4507,12 @@ int main (int argc, char** argv)
     }
     init_asmjit ();
 
-    yyout = OUTPUT;
-    yylex();
+    if (g_bTextUserInterface) {
+        g_pTextUserInterface( argc, argv );
+    }   else {
+        yyout = OUTPUT;
+        yylex();
+    }
 
     cout << g_cProgramCode.str() << endl;
     

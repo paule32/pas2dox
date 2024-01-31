@@ -11,3 +11,5 @@ libasmjit.a
 pas2dox.cpp
 libdwarf64.a
 dwarf.o
+turbo.o
+TSyntaxFileEditor.o
