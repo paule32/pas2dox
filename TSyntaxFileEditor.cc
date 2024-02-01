@@ -648,4 +648,3 @@ std::string TSyntaxFileEditor::getWordUnderCursor() {
     
     return word;
 }
-
