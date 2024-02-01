@@ -28,33 +28,33 @@ std::vector< TSyntaxCommentType  > TSyntaxComment;
 // -----------------------------------------------------------------
 std::map< std::string, TColorAttr > SyntaxPascalToken =
 {
-    { "program",        0x1f },    // 0x1f = blue on white
+    { "program",        0x1e },    // 0x1f = blue on white
     
-    { "array",          0x1f },
-    { "begin",          0x1f },
-    { "byte",           0x1f },
-    { "case",           0x1f },
-    { "char",           0x1f },
-    { "class",          0x1f },
-    { "do",             0x1f },
-    { "dec",            0x1f },
-    { "else",           0x1f },
-    { "end",            0x1f },
-    { "for",            0x1f },
-    { "if",             0x1f },
-    { "implementation", 0x1f },
-    { "inc",            0x1f },
-    { "integer",        0x1f },
-    { "interface",      0x1f },
-    { "of",             0x1f },
-    { "record",         0x1f },
-    { "string",         0x1f },
-    { "then",           0x1f },
-    { "unit",           0x1f },
-    { "until",          0x1f },
-    { "uses",           0x1f },
-    { "while",          0x1f },
-    { "word",           0x1f }
+    { "array",          0x1e },
+    { "begin",          0x1e },
+    { "byte",           0x1e },
+    { "case",           0x1e },
+    { "char",           0x1e },
+    { "class",          0x1e },
+    { "do",             0x1e },
+    { "dec",            0x1e },
+    { "else",           0x1e },
+    { "end",            0x1e },
+    { "for",            0x1e },
+    { "if",             0x1e },
+    { "implementation", 0x1e },
+    { "inc",            0x1e },
+    { "integer",        0x1e },
+    { "interface",      0x1e },
+    { "of",             0x1e },
+    { "record",         0x1e },
+    { "string",         0x1e },
+    { "then",           0x1e },
+    { "unit",           0x1e },
+    { "until",          0x1e },
+    { "uses",           0x1e },
+    { "while",          0x1e },
+    { "word",           0x1e }
 };
 
 // -----------------------------------------------------------------

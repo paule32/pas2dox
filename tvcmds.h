@@ -31,6 +31,11 @@ const ushort
 const int
     cmOpenNewProject    = 3001,
     cmCloseApplication  = 3002;
-    
+
+const int
+    cmButtonInfoWindow1 = 5000,
+    cmButtonInfoWindow2 = 5001,
+    cmGetFocusedEditor  = 5010;
+
 const int
     hcNewProject = 10000;

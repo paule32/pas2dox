@@ -122,7 +122,7 @@ public:
     // 0x1e => blue background on yellow text ...
     // -----------------------------------------------------
     TColorAttr EditorTextColor    = 0x1e;  // blue on yellow
-    TColorAttr EditorCommentColor = 0x30;  // green on black
+    TColorAttr EditorCommentColor = 0x13;  // green on blue
 };
 
 #endif  // TSYNTAXFILEEDITOR_H_

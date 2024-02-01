@@ -164,10 +164,12 @@ FILE * logFile = NULL;              // todo: assembly output
 # define Uses_TInputLine
 # define Uses_TCheckBoxes
 # define Uses_TLabel
+# define Uses_TListBox
 # define Uses_THistory
 # define Uses_TButton
 # define Uses_TSItem
 # define Uses_TMenuBar
+# define Uses_TCollection
 # define Uses_TSubMenu
 # define Uses_TMenuItem
 # define Uses_TStatusLine
@@ -351,6 +353,118 @@ TDialog *createReplaceDialog()
     return d;
 }
 
+// ---------------------------------------------------------------------------
+// green color palette for information window:
+// ---------------------------------------------------------------------------
+#define cpGreenDialog \
+    "\x75\x75\x75\x73\x74\x75\x76\x77\x75\x74\x7a\x7b\x74\x75\x12\x6f"\
+    "\x70\x71\x72\x73\x74\x75\x76\x77\x78\x79\x7a\x7b\x7c\x7d\x7e\x7f"
+
+// ---------------------------------------------------------------------------
+// TButton subclass (to colorize the TButton) ...
+// ---------------------------------------------------------------------------
+class TMyButton : public TButton {
+public:
+    TMyButton(
+        const TRect& bounds,
+        const char * text,
+        ushort cmd,
+        ushort aOptions):
+        TButton(bounds, text, cmd, aOptions) {
+        
+        growMode = gfGrowLoX | gfGrowHiX;
+    }
+    
+    TColorAttr mapColor(uchar index) noexcept {
+        switch (index) {
+            case  1:  return {0xffff00, 0x008000};
+            case  2:  return {0xffff00, 0x008000};
+            case  3:  return {0x000000, 0x0000ff};
+            case  4:  return {0x438939, 0x091297};
+            case  5:  return {0x438939, 0x091297};
+            case  6:  return {0x438939, 0x091297};
+            case  7:  return {0x438939, 0x091297};
+            case  8:  return {0x000000, 0x0030ff};  // shadow
+            default:  return errorAttr;
+        }
+    }
+};
+// ---------------------------------------------------------------------------
+// TButton subclass (to colorize the TButton's for the info window) ...
+// ---------------------------------------------------------------------------
+class TMyInfoButton : public TButton {
+public:
+    TMyInfoButton(
+        const TRect& bounds,
+        const char * text,
+        ushort cmd,
+        ushort aOptions):
+        TButton(bounds, text, cmd, aOptions) {
+        
+        growMode = gfGrowLoX | gfGrowHiX;
+    }    
+    TColorAttr mapColor(uchar index) noexcept {
+        switch (index) {
+            case  1:  return {0xffff00, 0x008000};
+            case  2:  return {0x00ff00, 0x008000};
+            case  3:  return {0x000000, 0x00a800};
+            case  4:  return {0x438939, 0x091297};
+            case  5:  return {0x438939, 0x091297};
+            case  6:  return {0x438939, 0x091297};
+            case  7:  return {0x438939, 0x091297};
+            case  8:  return {0x000000, 0x00a800};  // shadow
+            default:  return errorAttr;
+        }
+    }
+};
+// ---------------------------------------------------------------------------
+// TListBox for the Editor Window ...
+// ---------------------------------------------------------------------------
+class TMyListBox : public TListBox {
+public:
+    class LB_Collection: public TCollection {
+    public:
+        LB_Collection(short lim, short delta):
+        TCollection(lim, delta)
+		{}
+        virtual void  freeItem(void *p) {
+            delete[] (char *) p;
+        }
+    private:
+        virtual void *readItem( ipstream& ) { return 0; }
+        virtual void writeItem( void *, opstream& ) {}
+    };
+
+    TMyListBox(
+        const TRect& listBounds,
+        int   cols ,
+        std::vector< std::string > data,
+        TScrollBar * listScrollBar):
+        vScrollBar(  listScrollBar),
+        TListBox( listBounds,  cols, listScrollBar) {
+
+        growMode = gfGrowHiX | gfGrowHiY | gfGrowLoX;
+        
+        collection = new LB_Collection(5,5);
+        collection->insert( newStr("Hello") );
+        collection->insert( newStr("World") );
+        
+        newList(collection);
+    }
+    
+    ~TMyListBox() {
+        delete collection;
+    }
+
+    void setState(ushort aState, bool enable) {
+        TListBox::setState(aState, enable);
+        if (vScrollBar) vScrollBar->show();
+    }
+private:
+    TScrollBar    * vScrollBar;
+    LB_Collection * collection;
+};
+
 class TMyWindow : public TDialog {
 public:
     class MyEditorChild: public TSyntaxFileEditor {
@@ -366,7 +480,7 @@ public:
             owner(parent) {
             
             EditorTextColor    = 0x17;
-            EditorCommentColor = 0x40;
+            EditorCommentColor = 0x13;
         }
         // -------------------------------
         // event handler ...
@@ -387,10 +501,10 @@ public:
                     messageBox("getkey F1",mfInformation|mfOKButton);
                     return;
                 }   else
-                if (event.keyDown.keyCode == kbF2)  // F2
+                if (event.keyDown.keyCode == kbF9)  // F9
                 {
                     clearEvent(event);
-                    messageBox("getkey F2",mfInformation|mfOKButton);
+                    messageBox("getkey F9",mfInformation|mfOKButton);
                     return;
                 }
             }   else
@@ -420,18 +534,34 @@ public:
         insert(indicator  = new TIndicator( TRect(  2, size.y - 1,          16, size.y     ) ));
         
         insert(editor = new MyEditorChild(this,
-            TRect(1, 1, size.x - 24, size.y - 1),
+            TRect(1, 1, size.x - 24, size.y - 5),
             hScrollBar,
             vScrollBar,
             indicator,
             "www.txt"));
 
-        insert(button1 = new TButton(TRect(size.x - 21, 2, size.x - 3, 4), "Start",   cmButton1, bfNormal));
-        insert(button2 = new TButton(TRect(size.x - 21, 5, size.x - 3, 7), "Compile", cmButton2, bfNormal));
+        insert(button1 = new TMyButton(TRect(size.x - 21, 2, size.x - 3, 4), "Start",   cmButton1, bfNormal));
+        insert(button2 = new TMyButton(TRect(size.x - 21, 5, size.x - 3, 7), "Compile", cmButton2, bfNormal));
         
-        options   |= ofSelectable;
+        options   |= ofSelectable | ofTopSelect;
+        flags     |= wfMove
+                  |  wfGrow
+                  |  wfClose
+                  |  wfZoom;
+
         eventMask |= evBroadcast; // for get word under cursor
         
+        clientListScrollBar = new TScrollBar(TRect(size.x - 3,8, size.x - 2, size.y - 2));
+        insert(clientListScrollBar);
+        
+        std::vector< std::string > data =
+        {
+            "master", "client 1", "client 2"
+        };
+        clientList = new TMyListBox( TRect(size.x - 21,8, size.x -  3, size.y - 2), 1, data,
+        clientListScrollBar);
+        
+        insert(clientList);
         drawView();
     }
     // -------------------------------
@@ -462,8 +592,183 @@ private:
     TScrollBar    * vScrollBar;
     TScrollBar    * hScrollBar;
     
-    TButton       * button1;
-    TButton       * button2;
+    TMyButton     * button1;
+    TMyButton     * button2;
+    
+    TScrollBar    * clientListScrollBar;
+    TMyListBox    * clientList;
+};
+
+// -----------------------------------------------------------------
+// window for global information output's ...
+// -----------------------------------------------------------------
+class TMyTvInfoWindow : public TDialog {
+public:
+    class MyEditorChild: public TSyntaxFileEditor {
+    public:
+        MyEditorChild(
+        TMyTvInfoWindow * parent,
+        const TRect     & bounds,
+        TScrollBar      * hScrollBar,
+        TScrollBar      * vScrollBar,
+        TIndicator      * indicator,
+        TStringView       filename):
+        TSyntaxFileEditor( bounds,hScrollBar,vScrollBar,indicator,"www.txt"),
+        owner(parent) {
+        
+            EditorTextColor    = 0x20;          // green on black
+            EditorCommentColor = 0x21;          // green on blze
+        
+            // ----------------------------------------------
+            // standard pascal token color map ...
+            // ----------------------------------------------
+            std::map< std::string, TColorAttr > ErrorToken =
+            {
+                { "info",     0x2f },    // 0x2f = green on white
+                { "debug",    0x2f },    // 0x2f = green on white
+                { "warning",  0x2f },    // 0x2f = green on white
+                { "error",    0x2f }     // 0x2f = green on white
+            };
+            EditorSyntaxToken = ErrorToken;
+        }
+        // -------------------------------
+        // event handler ...
+        // -------------------------------
+        void handleEvent( TEvent &event )
+        {
+            TEditor::handleEvent( event );
+            if (event.what            == evBroadcast
+            &&  event.message.command == cmGetFocusedEditor
+            && (state & sfFocused)) {
+                clearEvent(event);
+            }   else
+            if (event.what == evKeyDown) {
+                if (event.keyDown.charScan.charCode == kbEsc)     // #27 - Escape
+                {
+                    owner->close();
+                    clearEvent(event);
+                    return;
+                }   else
+                if (event.keyDown.keyCode == kbF1)  // F1
+                {
+                    clearEvent(event);
+                    messageBox("getkey F1",mfInformation|mfOKButton);
+                    return;
+                }   else
+                if (event.keyDown.keyCode == kbF2)  // F2
+                {
+                    clearEvent(event);
+                    //messageBox("getkey F2",mfInformation|mfOKButton);
+                    messageBox(getWordUnderCursor().c_str(), mfInformation|mfOKButton);
+                    return;
+                }
+            }
+            if (event.what == evCommand) {
+                switch (event.message.command) {
+                case 9: {
+                    clearEvent(event);
+                    messageBox("getkey Help",mfInformation|mfOKButton);
+                    return;
+                }   break;
+                }
+            }
+        }
+        
+    private:
+        TMyTvInfoWindow * owner;
+    };
+    
+    // -------------------------------
+    // dtor: free allocated memory:
+    // -------------------------------
+    ~TMyTvInfoWindow() {
+        TObject::destroy(button2);
+        TObject::destroy(button1);
+        
+        TObject::destroy(hScrollBar);
+        TObject::destroy(vScrollBar);
+        
+        TObject::destroy(indicator);
+        TObject::destroy(editor);
+    }
+    
+    // -------------------------------
+    // ctor: create information window
+    // -------------------------------
+    TMyTvInfoWindow(const TRect& bounds):
+        TWindowInit(&TMyTvInfoWindow::initFrame),
+        TDialog(bounds, "Info window") {
+        
+        insert(hScrollBar = new TScrollBar( TRect( 18, size.y - 1, size.x - 23, size.y ) ));
+        insert(vScrollBar = new TScrollBar( TRect( size.x - 23, 1, size.x - 22, size.y - 1 ) ));
+        insert(indicator  = new TIndicator( TRect( 2, size.y - 1, 16, size.y) ));
+        
+        insert(editor = new MyEditorChild(this,
+            TRect(2, 1, size.x - 24, size.y - 1),
+            hScrollBar,
+            vScrollBar,
+            indicator,
+            "www.txt"));
+        insert(editor);
+        
+        insert(button1 = new TMyInfoButton(TRect( size.x - 19, 2, size.x - 4, 4 ), "Clear", cmButtonInfoWindow1, bfNormal));
+        insert(button2 = new TMyInfoButton(TRect( size.x - 19, 4, size.x - 4, 6 ), "Copy" , cmButtonInfoWindow2, bfNormal));
+        
+        options |= ofSelectable | ofTopSelect;
+        flags   |= wfMove
+                |  wfGrow
+                |  wfClose
+                |  wfZoom;
+    }
+    // -------------------------------
+    // event handler ...
+    // -------------------------------
+    void handleEvent(TEvent & event ){
+        if (event.what == evCommand && event.message.command == cmClose) {
+            messageBox("blaa blaa",mfInformation|mfOKButton);
+            clearEvent(event);
+            close();
+            return;
+        }
+        TWindow::handleEvent( event );
+        if (event.what == evCommand) {
+            switch (event.message.command) {
+                case cmClose: {
+                    close();
+                    clearEvent(event);
+                }   break;
+            }
+        }
+    }
+    
+    // --------------------------------------------------
+    // set the "green" style, depend on the palette items
+    // --------------------------------------------------
+    virtual TPalette& getPalette() const {
+        static TPalette palette( cpGreenDialog, sizeof(cpGreenDialog)-1 );
+        return palette;
+    }
+    
+    // -------------------------------
+    // insert text to the info window
+    // -------------------------------
+    bool insertText(const void* text, uint length) {
+        if (editor) {
+            editor->insertText(text,length,false);
+            return true;
+        }
+        return false;
+    }
+
+private:
+    MyEditorChild * editor;
+    TIndicator    * indicator;
+
+    TScrollBar    * vScrollBar;
+    TScrollBar    * hScrollBar;
+    
+    TMyInfoButton * button1;
+    TMyInfoButton * button2;
 };
 
 // ---------------------------------------------------------------------------
@@ -485,13 +790,38 @@ public:
     void fileNew();
     void fileOpen();
 private:
-    TMyWindow * editor;
+    void create_info_window();
+
+    TMyWindow   * editor;
 };
+TMyTvInfoWindow * info_message_window = nullptr;
+// -----------------------------------------------------------------
+// create the information window view.
+// -----------------------------------------------------------------
+void TFormApp::create_info_window()
+{
+    if (info_message_window != nullptr)
+    return;
+
+    info_message_window = (TMyTvInfoWindow*) validView(
+    new TMyTvInfoWindow(
+        TRect(    2,
+        size.y - 10,
+        size.x -  4,
+        size.y -  3)));
+
+    if (info_message_window != nullptr) {
+        //info_message_window->helpCtx = hcCalendar;
+        deskTop->insert( info_message_window );
+    }
+}
 
 TMyWindow *
 TFormApp::openEditor( const char * fileName )
 {
-    TRect  r = deskTop->getExtent();
+    TRect r = deskTop->getExtent();
+    r.b.y   = r.b.y - 8;
+    
     TMyWindow *editor = (TMyWindow *) validView( new TMyWindow(r, fileName));
 
     if (editor != nullptr) {
@@ -506,6 +836,8 @@ void TFormApp::fileOpen()
     char fileName[MAXPATH];
     strcpy( fileName, "*.*" );
 
+    create_info_window();
+    
     if( execDialog( new TFileDialog( "*.*", "Open file",
             "~N~ame", fdOpenButton, 100 ), fileName) != cmCancel )
     openEditor(fileName);
