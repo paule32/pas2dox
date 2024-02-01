@@ -63,8 +63,21 @@ FLAGSCC= -m64 -O2 -fPIC             \
 
 INSTALL_DIR=/usr/local/bin/
 
-pas2dox.exe: libasmjit.a  pas2dox.cpp
-	$(XX) -o pas2dox.o -c pas2dox.cpp
+OBJECTS=dwarf.o TSyntaxFileEditor.o pas2dox.o
+
+TSyntaxFileEditor.o: TSyntaxFileEditor.cc TSyntaxFileEditor.h
+	$(XX) -o TSyntaxFileEditor.o -c TSyntaxFileEditor.cc
+
+dwarf.o: dwarf.c
+	$(CC) -o dwarf.o -c dwarf.c
+
+pas2dox.cpp: pas2dox.l
+	flex -i -o pas2dox.cpp pas2dox.l
+
+pas2dox.o: pas2dox.cpp
+	${XX} -o pas2dox.o -c pas2dox.cpp
+
+pas2dox.exe: $(OBJECTS)
 	${XX} -o pas2dox.exe  pas2dox.o \
     TSyntaxFileEditor.o             \
     -L./                            \
@@ -82,24 +95,17 @@ pas2dox.exe: libasmjit.a  pas2dox.cpp
                                     \
     -static-libgcc                  \
     -static-libstdc++
-	
+
+.PHONY: all
+all: pas2dox.exe
 	strip ./pas2dox.exe
 	cp    ./pas2dox.exe ./pas2dox.upx.exe
 	upx                 ./pas2dox.upx.exe
 
-TSyntaxFileEditor.o: TSyntaxFileEditor.cc TSyntaxFileEditor.h
-	$(XX) -o TSyntaxFileEditor.o -c TSyntaxFileEditor.cc
+.PHONY: clean
+clean:
+	rm -f ./pas2dox.cpp ./pas2dox.exe ./*.o
 
-dwarf.o: dwarf.c
-	$(CC) -o dwarf.o -c dwarf.c
-
-pas2dox.cpp: dwarf.o TSyntaxFileEditor.o pas2dox.l
-	flex -i -o pas2dox.cpp pas2dox.l
-
-.PHONY : clean
-clean :
-	rm -f ./pas2dox.cpp ./pas2dox.exe
-
-.PHONY : install
-install :
+.PHONY: install
+install:
 	cp ./pas2dox.exe ${INSTALL_DIR}

@@ -163,6 +163,7 @@ FILE * logFile = NULL;              // todo: assembly output
 # define Uses_TKeys
 # define Uses_TInputLine
 # define Uses_TCheckBoxes
+# define Uses_TCountViewer
 # define Uses_TLabel
 # define Uses_TListBox
 # define Uses_THistory
@@ -526,7 +527,7 @@ public:
     }
     TMyWindow(const TRect& bounds, const char* filename):
         TWindowInit(&TMyWindow::initFrame),
-        TDialog(bounds, "Mein Fenster") {
+        TDialog(bounds, filename) {
         palette = dpBlueDialog;
 
         insert(hScrollBar = new TScrollBar( TRect( 18, size.y - 1, size.x - 23, size.y     ) ));
@@ -658,7 +659,7 @@ public:
                 if (event.keyDown.keyCode == kbF2)  // F2
                 {
                     clearEvent(event);
-                    //messageBox("getkey F2",mfInformation|mfOKButton);
+                    messageBox("getkey F2",mfInformation|mfOKButton);
                     messageBox(getWordUnderCursor().c_str(), mfInformation|mfOKButton);
                     return;
                 }
@@ -725,9 +726,8 @@ public:
     // -------------------------------
     void handleEvent(TEvent & event ){
         if (event.what == evCommand && event.message.command == cmClose) {
-            messageBox("blaa blaa",mfInformation|mfOKButton);
             clearEvent(event);
-            close();
+            hide();
             return;
         }
         TWindow::handleEvent( event );
@@ -800,19 +800,21 @@ TMyTvInfoWindow * info_message_window = nullptr;
 // -----------------------------------------------------------------
 void TFormApp::create_info_window()
 {
-    if (info_message_window != nullptr)
-    return;
-
-    info_message_window = (TMyTvInfoWindow*) validView(
-    new TMyTvInfoWindow(
-        TRect(    2,
-        size.y - 10,
-        size.x -  4,
-        size.y -  3)));
-
     if (info_message_window != nullptr) {
-        //info_message_window->helpCtx = hcCalendar;
-        deskTop->insert( info_message_window );
+        info_message_window->show();
+    }   else {
+
+        info_message_window = (TMyTvInfoWindow*) validView(
+        new TMyTvInfoWindow(
+            TRect(    2,
+            size.y - 10,
+            size.x -  4,
+            size.y -  3)));
+
+        if (info_message_window != nullptr) {
+            //info_message_window->helpCtx = hcCalendar;
+            deskTop->insert( info_message_window );
+        }
     }
 }
 
@@ -820,7 +822,10 @@ TMyWindow *
 TFormApp::openEditor( const char * fileName )
 {
     TRect r = deskTop->getExtent();
-    r.b.y   = r.b.y - 8;
+    
+    r.a.x = r.a.x +  1;
+    r.b.x = r.b.x -  5;
+    r.b.y = r.b.y - 10;
     
     TMyWindow *editor = (TMyWindow *) validView( new TMyWindow(r, fileName));
 
@@ -879,7 +884,29 @@ void TFormApp::handleEvent(TEvent& event)
     int newMode;
     char aboutMsg[80];
 
+    if (event.what == evKeyDown) {
+        if (event.keyDown.charScan.charCode == kbEsc)     // #27 - Escape
+        {
+            clearEvent(event);
+            exit(0);
+        }   else
+        if (event.keyDown.keyCode == kbF1)  // F1
+        {
+            clearEvent(event);
+            messageBox("getkey F1",mfInformation|mfOKButton);
+            return;
+        }   else
+        if (event.keyDown.keyCode == kbF2)  // F2
+        {
+            clearEvent(event);
+            messageBox("getkey F2",mfInformation|mfOKButton);
+            messageBox("huhu", mfInformation|mfOKButton);
+            return;
+        }
+    }
+    
     TApplication::handleEvent(event);
+    
     if (event.what == evCommand) {
         switch (event.message.command) {
         case cmListOpen:
@@ -909,7 +936,7 @@ TMenuBar *TFormApp::initMenuBar( TRect r)
 
         * new TSubMenu( "~F~ile", hcNoContext) +
             * new TMenuItem( "~O~pen...", cmListOpen, kbF3, hcNoContext, "F3" ) +
-            * new TMenuItem( "~S~ave"   , cmListSave, kbF2, hcNoContext, "F2" ) +
+            * new TMenuItem( "~S~ave"   , cmListSave, kbCtrlS, hcNoContext, "Ctrl-~S~" ) +
               newLine() +
             * new TMenuItem( "~C~hange directory...", cmChgDir  , kbNoKey, hcNoContext ) +
             * new TMenuItem( "~D~OS shell"          , cmDosShell, kbNoKey, hcNoContext ) +
@@ -928,7 +955,7 @@ TFormApp::initStatusLine( TRect r )
     r.a.y = r.b.y - 1;
     return new TStatusLine( r,
         * new TStatusDef( 0, 0xFFFF ) +
-            * new TStatusItem( "~F2~ Save" , kbF2 , cmListSave ) +
+            * new TStatusItem( "Ctrl-~S~ Save" , kbCtrlS , cmListSave ) +
             * new TStatusItem( "~F3~ Open" , kbF3 , cmListOpen ) +
             * new TStatusItem( "~F10~ Menu", kbF10, cmMenu     ) +
 

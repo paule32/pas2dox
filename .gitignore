@@ -15,3 +15,5 @@ turbo.o
 TSyntaxFileEditor.o
 www.bak
 www.txt
+*.dll
+packed.zip

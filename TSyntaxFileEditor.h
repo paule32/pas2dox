@@ -82,6 +82,9 @@ extern std::map< std::string, TColorAttr > SyntaxPascalToken;
 // -----------------------------------------------------------------
 class TSyntaxFileEditor: public TFileEditor
 {
+    bool selected;       // true, when text is selected
+    TColorAttr Color;
+    
 public:
     TSyntaxFileEditor(
         const TRect  & bounds,
@@ -121,8 +124,9 @@ public:
     // default is blue on yellow the BIOS color code:
     // 0x1e => blue background on yellow text ...
     // -----------------------------------------------------
-    TColorAttr EditorTextColor    = 0x1e;  // blue on yellow
-    TColorAttr EditorCommentColor = 0x13;  // green on blue
+    TColorAttr EditorTextColor     = 0x1e;  // blue on yellow
+    TColorAttr EditorCommentColor  = 0x13;  // green on blue
+    TColorAttr EditorSelectedColor = 0x20;
 };
 
 #endif  // TSYNTAXFILEEDITOR_H_

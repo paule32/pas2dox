@@ -1,6 +1,6 @@
 // -----------------------------------------------------------------
 // File:   TSyntaxFileEditor.cc
-// Author: (c) 2023 Jens Kallup - paule32
+// Author: (c) 2023, 2024 Jens Kallup - paule32
 // All rights reserved
 //
 // only for education, and non-profit usage !
@@ -75,12 +75,42 @@ TSyntaxFileEditor::TSyntaxFileEditor(
 
     // for get word under cursor
     eventMask |= evBroadcast;
+    
+    // ----------------------------------------------
+    // no selected text at begin of construction
+    // ----------------------------------------------
+    selected = false;
 }
     
 // -------------------------------
 // event handler ...
 // -------------------------------
-void TSyntaxFileEditor::handleEvent( TEvent &event ) {
+void TSyntaxFileEditor::handleEvent( TEvent &event )
+{
+    static bool oooo = false;
+
+    if (event.what == evKeyDown) {
+        if (event.keyDown.keyCode == kbLeft) {
+            if ((event.keyDown.controlKeyState == 0x0310)
+            ||  (event.keyDown.controlKeyState == 0x0110)) {
+                clearEvent(event);
+                
+                selecting = true;
+                selected  = true;
+
+                selEnd   = 20;
+                selStart = 10;
+                
+                Color    = EditorCommentColor;
+            }
+        }   else
+        if (event.keyDown.keyCode == kbCtrlS) {
+            clearEvent(event);
+            messageBox("ctrl + s",mfInformation|mfOKButton);
+            return;
+        }
+    }
+
     TFileEditor::handleEvent( event );
 }
 
@@ -105,6 +135,8 @@ void TSyntaxFileEditor::formatLine(
     char Ch;
     
     int X = 0;
+    int Y = 0;
+
     Color = EditorTextColor;
     token = "";
     
@@ -112,14 +144,21 @@ void TSyntaxFileEditor::formatLine(
         if (P >= bufLen || X >= Width) break;
         tokenIsComment = false;
         chars = bufChars(P);
-        Color = EditorTextColor;
+        
+        //Color = getSelected(X,Y);
+        //Color = EditorSelectedColor; else
+        //Color = EditorTextColor;
+
         Ch    = chars[0];
         
         // ----------------------------
         // parse white space's ...
         // ----------------------------
         if (Ch == ' ') {
-            Color = EditorTextColor;
+            //Color = getSelected(X,Y);
+            //Color = EditorSelectedColor; else
+            //Color = EditorTextColor;
+        
             while (X < Width) {
                 ::setCell(Cells[X], Ch, Color);
                 X++;
@@ -136,7 +175,11 @@ void TSyntaxFileEditor::formatLine(
         if (((Ch >= 'A') && (Ch <= 'Z'))
         ||  ((Ch >= 'a') && (Ch <= 'z'))) {
             pos = X;
-            ::setCell(Cells[X++], Ch, EditorTextColor);
+            if (selected)
+            Color = EditorSelectedColor; else
+            Color = EditorTextColor;
+        
+            ::setCell(Cells[X++], Ch, Color);
             token.push_back(Ch);
             while (1) {
                 if ((P >= bufLen) || (X >= Width)) break;
@@ -147,7 +190,11 @@ void TSyntaxFileEditor::formatLine(
                 ||  ((Ch >= 'a') && (Ch <= 'z'))
                 ||  ((Ch >= '0') && (Ch <= '9'))
                 ||  (Ch == '_')) {
-                    ::setCell(Cells[X++], Ch, EditorTextColor);
+                    if (selected)
+                    Color = EditorSelectedColor; else
+                    Color = EditorTextColor;
+        
+                    ::setCell(Cells[X++], Ch, Color);
                     token.push_back(Ch);
                 }   else break;
             }
@@ -163,13 +210,21 @@ void TSyntaxFileEditor::formatLine(
             auto it = EditorSyntaxToken.find(token);
             if (it != EditorSyntaxToken.end()) {
                 for (char &c: token) {
+                    if (selected)
+                    Color = EditorSelectedColor; else
+                    Color = it->second;
+                
                     if (X >= Width) break;
-                    ::setCell(Cells[X++], c, it->second);
+                    ::setCell(Cells[X++], c, Color);
                 }
             }   else {
                 for (char &c: token) {
                     if (X >= Width) break;
-                    ::setCell(Cells[X++], c, EditorTextColor);
+                    if (selected)
+                    Color = EditorSelectedColor; else
+                    Color = EditorTextColor;
+                
+                    ::setCell(Cells[X++], c, Color);
                 }
             }
             token = "";
@@ -179,7 +234,10 @@ void TSyntaxFileEditor::formatLine(
         // parse comment's ...
         // ----------------------------
         if (Ch == '&') {
+            if (selected)
+            Color = EditorSelectedColor; else
             Color = EditorTextColor;
+
             ::setCell(Cells[X], '&', Color);
             X++;
             P++;
@@ -192,10 +250,14 @@ void TSyntaxFileEditor::formatLine(
             // ----------------------------
             if (Ch == '&') {
                 tokenIsComment = true;
-                ::setCell(Cells[X-1], Ch, EditorCommentColor);
+                if (selected)
+                Color = EditorSelectedColor; else
+                Color = EditorCommentColor;
+            
+                ::setCell(Cells[X-1], Ch, Color);
                 if (X < Width) {
                     do  {
-                        ::setCell(Cells[X++], Ch, EditorCommentColor);
+                        ::setCell(Cells[X++], Ch, Color);
                         P++;
                         chars = bufChars(P);
                         Ch = chars[0];
@@ -210,11 +272,19 @@ void TSyntaxFileEditor::formatLine(
                 }   else break;
             }   else
             if (Ch == '\r' || Ch == '\n') {
+                if (selected)
+                Color = EditorSelectedColor; else
+                Color = EditorCommentColor;
+            
                 while (X < Width)
                 ::setCell(Cells[X++], ' ', Color);
                 P++;
                 break;
             }   else {
+                if (selected)
+                Color = EditorSelectedColor; else
+                Color = EditorTextColor;
+            
                 ::setCell(Cells[X], Ch, Color);
                 X++;
                 P++;
@@ -222,6 +292,10 @@ void TSyntaxFileEditor::formatLine(
             }
         }   else
         if (Ch == '/') {
+            if (selected)
+            Color = EditorSelectedColor; else
+            Color = EditorTextColor;
+        
             ::setCell(Cells[X], '/', Color);
             X++;
             P++;
@@ -234,10 +308,14 @@ void TSyntaxFileEditor::formatLine(
             // ----------------------------
             if (Ch == '/') {
                 tokenIsComment = true;
-                ::setCell(Cells[X-1], Ch, EditorCommentColor);
+                if (selected)
+                Color = EditorSelectedColor; else
+                Color = EditorCommentColor;
+            
+                ::setCell(Cells[X-1], Ch, Color);
                 if (X < Width) {
                     do  {
-                        ::setCell(Cells[X++], Ch, EditorCommentColor);
+                        ::setCell(Cells[X++], Ch, Color);
                         P++;
                         chars = bufChars(P);
                         Ch = chars[0];
@@ -257,7 +335,10 @@ void TSyntaxFileEditor::formatLine(
             // ----------------------------
             if (Ch == '*') {
                 tokenIsComment = true;
+                if (selected)
+                Color = EditorSelectedColor; else
                 Color = EditorCommentColor;
+
                 ::setCell(Cells[X-1], '/', Color);
                 ::setCell(Cells[X  ], '*', Color);
                 X++;
@@ -267,6 +348,10 @@ void TSyntaxFileEditor::formatLine(
                     chars = bufChars(P);
                     Ch = chars[0];
                     if (Ch == '*') {
+                        if (selected)
+                        Color = EditorSelectedColor; else
+                        Color = EditorCommentColor;
+                    
                         ::setCell(Cells[X], '*', Color);
                         X++;
                         P++;
@@ -274,6 +359,10 @@ void TSyntaxFileEditor::formatLine(
                         chars = bufChars(P);
                         Ch = chars[0];
                         if (Ch == '/') {
+                            if (selected)
+                            Color = EditorSelectedColor; else
+                            Color = EditorCommentColor;
+                        
                             ::setCell(Cells[X], Ch, Color);
                             tokenIsComment = false;
                             Color = EditorTextColor;
@@ -294,26 +383,42 @@ void TSyntaxFileEditor::formatLine(
                         }
                     }   else
                     if (Ch == '\r' || Ch == '\n') {
+                        if (selected)
+                        Color = EditorSelectedColor; else
+                        Color = EditorCommentColor;
+        
                         while (X < Width)
-                        ::setCell(Cells[X++], ' ', EditorCommentColor);
+                        ::setCell(Cells[X++], ' ', Color);
                         P++;
                         if (P >= bufLen || X >= Width) break;
                     }   else {
-                        ::setCell(Cells[X], Ch, EditorCommentColor);
+                        if (selected)
+                        Color = EditorSelectedColor; else
+                        Color = EditorCommentColor;
+                    
+                        ::setCell(Cells[X], Ch, Color);
                         X++;
                         P++;
                         if (P >= bufLen || X >= Width) break;
                     }
                 }
             }   else {
-                ::setCell(Cells[X], Ch, EditorTextColor);
+                if (selected)
+                Color = EditorSelectedColor; else
+                Color = EditorTextColor;
+        
+                ::setCell(Cells[X], Ch, Color);
                 X++;
                 P++;
                 if (P >= bufLen || X >= Width) break;
             }
         }   else
         if (Ch == '(') {
-            ::setCell(Cells[X], '(', EditorTextColor);
+            if (selected)
+            Color = EditorSelectedColor; else
+            Color = EditorTextColor;
+        
+            ::setCell(Cells[X], '(', Color);
             X++;
             P++;
             chars = bufChars(P);
@@ -325,7 +430,10 @@ void TSyntaxFileEditor::formatLine(
             // ----------------------------
             if (Ch == '*') {
                 tokenIsComment = true;
+                if (selected)
+                Color = EditorSelectedColor; else
                 Color = EditorCommentColor;
+
                 ::setCell(Cells[X-1], '(', Color);
                 ::setCell(Cells[X  ], '*', Color);
                 X++;
@@ -362,19 +470,31 @@ void TSyntaxFileEditor::formatLine(
                         }
                     }   else
                     if (Ch == '\r' || Ch == '\n') {
+                        if (selected)
+                        Color = EditorSelectedColor; else
+                        Color = EditorCommentColor;
+                    
                         while (X < Width)
-                        ::setCell(Cells[X++], ' ', EditorCommentColor);
+                        ::setCell(Cells[X++], ' ', Color);
                         P++;
                         if (P >= bufLen || X >= Width) break;
                     }   else {
-                        ::setCell(Cells[X], Ch, EditorCommentColor);
+                        if (selected)
+                        Color = EditorSelectedColor; else
+                        Color = EditorCommentColor;
+                    
+                        ::setCell(Cells[X], Ch, Color);
                         X++;
                         P++;
                         if (P >= bufLen || X >= Width) break;
                     }
                 }
             }   else {
-                ::setCell(Cells[X], Ch, EditorTextColor);
+                if (selected)
+                Color = EditorSelectedColor; else
+                Color = EditorTextColor;
+            
+                ::setCell(Cells[X], Ch, Color);
                 X++;
                 P++;
                 if (P >= bufLen || X >= Width) break;
@@ -384,6 +504,10 @@ void TSyntaxFileEditor::formatLine(
             if (tokenIsComment)
             Color = EditorCommentColor; else
             Color = EditorTextColor;
+        
+            if (selected)
+            Color = EditorSelectedColor;
+
             ::setCell(Cells[X], '*', Color);
             X++;
             P++;
@@ -396,10 +520,18 @@ void TSyntaxFileEditor::formatLine(
             // ----------------------------
             if (Ch == '*') {
                 tokenIsComment = true;
-                ::setCell(Cells[X-1], Ch, EditorCommentColor);
+                if (selected)
+                Color = EditorSelectedColor; else
+                Color = EditorCommentColor;
+            
+                ::setCell(Cells[X-1], Ch, Color);
                 if (X < Width) {
                     do  {
-                        ::setCell(Cells[X++], Ch, EditorCommentColor);
+                        if (selected)
+                        Color = EditorSelectedColor; else
+                        Color = EditorCommentColor;
+                    
+                        ::setCell(Cells[X++], Ch, Color);
                         P++;
                         chars = bufChars(P);
                         Ch = chars[0];
@@ -419,8 +551,11 @@ void TSyntaxFileEditor::formatLine(
             // ----------------------------
             if (Ch == '/') {
                 tokenIsComment = false;
-                Color = EditorTextColor;
-                ::setCell(Cells[X], '/', EditorCommentColor);
+                if (selected)
+                Color = EditorSelectedColor; else
+                Color = EditorCommentColor;
+                
+                ::setCell(Cells[X], '/', Color);
                 X++;
                 P++;
                 if (P >= bufLen || X >= Width) break;
@@ -431,14 +566,20 @@ void TSyntaxFileEditor::formatLine(
             // ----------------------------
             if (Ch == ')') {
                 tokenIsComment = false;
-                Color = EditorTextColor;
-                ::setCell(Cells[X], ')', EditorCommentColor);
+                if (selected)
+                Color = EditorSelectedColor; else
+                Color = EditorCommentColor;
+
+                ::setCell(Cells[X], ')', Color);
                 X++;
                 P++;
                 if (P >= bufLen || X >= Width) break;
             }   else {
+                if (selected)
+                Color = EditorSelectedColor; else
                 Color = EditorCommentColor;
-                ::setCell(Cells[X], '*', EditorCommentColor);
+            
+                ::setCell(Cells[X], '*', Color);
                 X++;
                 P++;
                 if (P >= bufLen || X >= Width) break;
@@ -446,6 +587,10 @@ void TSyntaxFileEditor::formatLine(
         }   else
         if (Ch == '\r' || Ch == '\n') {
             tokenIsComment = false;
+            if (selected)
+            Color = EditorSelectedColor; else
+            Color = EditorTextColor;
+        
             while (X < Width)
             ::setCell(Cells[X++], ' ', Color);
             P++;
@@ -455,6 +600,10 @@ void TSyntaxFileEditor::formatLine(
             if (tokenIsComment)
             Color = EditorCommentColor; else
             Color = EditorTextColor;
+        
+            if (selected)
+            Color = EditorSelectedColor;
+
             if (X < Width) {
                 do {
                     ::setCell(Cells[X++], ' ', Color);
@@ -465,10 +614,19 @@ void TSyntaxFileEditor::formatLine(
             if (tokenIsComment)
             Color = EditorCommentColor; else
             Color = EditorTextColor;
+        
+            if (selected)
+            Color = EditorSelectedColor;
+        
             if (!formatCell(Cells, (uint&) X, chars, P, Color))
             break;
         }
     }
+    
+    if (selected)
+    Color = EditorSelectedColor; else
+    Color = EditorTextColor;
+
     while (X < Width)
     ::setCell(Cells[X++], ' ', Color);
 }
@@ -490,3 +648,4 @@ std::string TSyntaxFileEditor::getWordUnderCursor() {
     
     return word;
 }
+
