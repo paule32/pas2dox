@@ -83,8 +83,6 @@ extern std::map< std::string, TColorAttr > SyntaxPascalToken;
 class TSyntaxFileEditor: public TFileEditor
 {
     bool selected;       // true, when text is selected
-    TColorAttr Color;
-    
 public:
     TSyntaxFileEditor(
         const TRect  & bounds,
@@ -92,8 +90,7 @@ public:
         TScrollBar   * vScrollBar,
         TIndicator   * indicator,
         TStringView    filename);
-        
-    
+
     // -------------------------------
     // event handler ...
     // -------------------------------
