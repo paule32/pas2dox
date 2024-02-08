@@ -54,6 +54,15 @@
 # include <map>
 
 // -----------------------------------------------------------------
+// sanity checks of used old school C macros ...
+// -----------------------------------------------------------------
+# undef EOL
+# undef EOF
+
+# define EOL(c) ((c == '\n') || (c == '\r'))
+# define EOF(c) ((c == '\0') || (c == -1))
+
+// -----------------------------------------------------------------
 // this is our "syntax type" enum class to describe the highlighter
 // -----------------------------------------------------------------
 enum class TSyntaxLanguageType : unsigned char {
@@ -82,7 +91,10 @@ extern std::map< std::string, TColorAttr > SyntaxPascalToken;
 // -----------------------------------------------------------------
 class TSyntaxFileEditor: public TFileEditor
 {
-    bool selected;       // true, when text is selected
+    std::vector< TColorAttr > shadowCopy;  // text color attributes
+    std::map   < int, int   > shadowData;  // text length data
+    
+    bool selected;                         // true, when text is selected
 public:
     TSyntaxFileEditor(
         const TRect  & bounds,
@@ -105,6 +117,13 @@ public:
         int Width,
         TAttrPair Colors
         ) override;
+    
+    // -----------------------------------------------------
+    // map the color to TColorAttr index ...
+    // -----------------------------------------------------
+    #if 0
+    TColorAttr mapColor(uchar index) noexcept;
+    #endif
     
     // -------------------------------
     // get the word under the cursor:

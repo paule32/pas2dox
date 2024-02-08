@@ -88,12 +88,68 @@ TSyntaxFileEditor::TSyntaxFileEditor(
 // -------------------------------
 void TSyntaxFileEditor::handleEvent( TEvent &event )
 {
-    static int pos, flag = 0;
+    int flag = 0;
+    int  pos = 0;
+
+    TStringView chars;
+    static int  xpos = 0;
+    static int  ypos = 1;
+    
+    static uint P = 0;
     char   Ch;
     
     if (event.what == evKeyDown)
     {
-        if (event.keyDown.keyCode == kbLeft) {
+        while (1) {
+            if (P >= bufLen) break;
+            chars  = bufChars(P);
+            Ch     = chars[0];
+            xpos   = xpos + 1;
+            if (EOL(Ch)) {
+                shadowData[ypos] = xpos;
+                ypos++;
+                P += 2;
+                xpos = 0;
+            }
+            P++;
+        }
+        
+        xpos = cursor.x;
+        ypos = cursor.y;
+        
+        if (event.keyDown.keyCode == kbLeft)
+        {
+            if ((xpos-1) < 0) {
+                xpos = 0;
+                if ((ypos-1) < 0) {
+                    ypos = 0;
+                    xpos = shadowData[ypos];
+                    setCursor(xpos, ypos);
+                    return;
+                }   else {
+                    ypos = ypos - 1;
+                    xpos = shadowData[ypos];
+                    setCursor(xpos, ypos);
+                    return;
+                }
+            }   else {
+                xpos  = xpos - 1;
+                chars = bufChars(xpos);
+                Ch    = chars[0];
+                
+                if (EOL(Ch)) {
+                    xpos = shadowData[ypos];
+                    xpos = xpos + 2;
+                    ypos = ypos - 1;
+                    if (ypos < 0) {
+                        ypos = 0;
+                    }
+                }
+                setCursor(xpos, ypos);
+                writeChar(xpos, ypos, Ch, 0x0f, 1);
+                return;
+            }
+/*
             if ((event.keyDown.controlKeyState == 0x310)
             ||  (event.keyDown.controlKeyState == 0x330)
             ||  (event.keyDown.controlKeyState == 0x390)
@@ -105,34 +161,20 @@ void TSyntaxFileEditor::handleEvent( TEvent &event )
                 selecting = true;
                 selected  = true;
 
-                if ((cursor.x < 1) && (cursor.y == 1)) {
+                if ((--cursor.x < 1) && (--cursor.y < 1)) {
                     cursor.x = 1;
-                }
-                
-                if (pos < 1) {
-                    cursor.x = 1;
-                    pos = 1;
+                    cursor.y = 1;
+                    setCursor(cursor.x, cursor.y);
                     return;
                 }
                 
-                Ch = bufChar(--pos);
+                Ch = bufChar(pos);
                 
                 if (Ch == '\n' || Ch == '\r') {
-                    pos = pos - 2;
                     Ch  = bufChar(pos);
-                    
-                    cursor.y = cursor.y - 1;
-                    setCursor(cursor.x, cursor.y);
-                    
-                    int  l = 1;
-                    for (l = 1; l < 2048; ++l) {
-                        if ((bufChar( l ) == '\n')
-                        ||  (bufChar( l ) == '\r'))
-                        break;
-                    }
-                    
-                    cursor.x = l;
-                    setCursor(cursor.x, cursor.y);
+                    setCursor( cursor.x, cursor.y - 1);
+                    writeChar( cursor.x, cursor.y, Ch, 0x0f, 1);
+                    return;
                 }
                 
                 selStart  = cursor.x - 1;
@@ -140,13 +182,27 @@ void TSyntaxFileEditor::handleEvent( TEvent &event )
                 
                 //TColorAttr Color = { 0xffff00, 0x008000 };
                 uchar Color = 0x0f;
-                writeChar(cursor.x-1, cursor.y, Ch, Color, 1);
+                writeChar(cursor.x-1, cursor.y, Ch, 0x0f, 1);
                 
                 setCursor(cursor.x-1, cursor.y);
                 return;
             }
+*/
         }   else
-        if (event.keyDown.keyCode == kbRight) {
+        if (event.keyDown.keyCode == kbRight)
+        {
+            xpos  = xpos + 1;
+            chars = bufChars(xpos);
+            Ch    = chars[0];
+            
+            if (EOL(Ch)) {
+                ypos = ypos + 1;
+                xpos = 0;
+            }
+            
+            setCursor(xpos, ypos);
+            
+            /*
             if ((event.keyDown.controlKeyState == 0x310)
             ||  (event.keyDown.controlKeyState == 0x330)
             ||  (event.keyDown.controlKeyState == 0x390)
@@ -182,11 +238,12 @@ void TSyntaxFileEditor::handleEvent( TEvent &event )
    
                 //TColorAttr Color = { 0xffff00, 0x008000 };
                 uchar Color = 0x0f;
-                writeChar(cursor.x, cursor.y, Ch, Color, 1);
+                writeChar(cursor.x, cursor.y, Ch, 1, 1);
                 
                 setCursor(cursor.x + 1, cursor.y);
                 return;
             }
+*/
         }   else
         if (event.keyDown.keyCode == kbCtrlS) {
             clearEvent(event);
@@ -220,9 +277,15 @@ void TSyntaxFileEditor::formatLine(
     
     int X = 0;
     int Y = 0;
+    int L = 0;
 
     Color = EditorTextColor;
     token = "";
+    
+    // ---------------------------------------
+    // set new size of shadowCopy - TColorAttr
+    // ---------------------------------------
+    shadowCopy.clear();
     
     while (1) {
         if (P >= bufLen || X >= Width) break;
@@ -230,7 +293,8 @@ void TSyntaxFileEditor::formatLine(
         chars = bufChars(P);
         
         Color = EditorTextColor;
-        Ch    = chars[0];
+        shadowCopy.push_back(Color);
+        Ch = chars[0];
         
         // ----------------------------
         // parse white space's ...
@@ -238,7 +302,8 @@ void TSyntaxFileEditor::formatLine(
         if (Ch == ' ') {
             while (X < Width) {
                 Color = EditorTextColor;
-
+                shadowCopy.push_back(Color);
+                
                 ::setCell(Cells[X], Ch, Color);
                 X++;
                 P++;
@@ -254,22 +319,29 @@ void TSyntaxFileEditor::formatLine(
         if (((Ch >= 'A') && (Ch <= 'Z'))
         ||  ((Ch >= 'a') && (Ch <= 'z'))) {
             pos = X;
+            
             Color = EditorTextColor;
+            shadowCopy.push_back(Color);
 
             ::setCell(Cells[X++], Ch, Color);
+            L++;
             token.push_back(Ch);
             while (1) {
                 if ((P >= bufLen) || (X >= Width)) break;
                 P++;
                 chars = bufChars(P);
                 Ch = chars[0];
+                
                 if (((Ch >= 'A') && (Ch <= 'Z'))
                 ||  ((Ch >= 'a') && (Ch <= 'z'))
                 ||  ((Ch >= '0') && (Ch <= '9'))
                 ||  (Ch == '_')) {
                     Color = EditorTextColor;
+                    shadowCopy.push_back(Color);
                     
                     ::setCell(Cells[X++], Ch, Color);
+                    L++;
+                    
                     token.push_back(Ch);
                 }   else break;
             }
@@ -286,15 +358,20 @@ void TSyntaxFileEditor::formatLine(
             if (it != EditorSyntaxToken.end()) {
                 for (char &c: token) {
                     Color = it->second;
+                    shadowCopy.push_back(Color);
+
                     if (X >= Width) break;
                     ::setCell(Cells[X++], c, Color);
+                    L++;
                 }
             }   else {
                 for (char &c: token) {
                     if (X >= Width) break;
                     Color = EditorTextColor;
-                
+                    shadowCopy.push_back(Color);
+                    
                     ::setCell(Cells[X++], c, Color);
+                    L++;
                 }
             }
             token = "";
@@ -305,10 +382,12 @@ void TSyntaxFileEditor::formatLine(
         // ----------------------------
         if (Ch == '&') {
             Color = EditorTextColor;
+            shadowCopy.push_back(Color);
 
             ::setCell(Cells[X], '&', Color);
             X++;
             P++;
+            L++;
             chars = bufChars(P);
             Ch = chars[0];
             if (P >= bufLen || X >= Width) break;
@@ -323,14 +402,20 @@ void TSyntaxFileEditor::formatLine(
                 ::setCell(Cells[X-1], Ch, Color);
                 if (X < Width) {
                     do  {
+                        shadowCopy.push_back(Color);
                         ::setCell(Cells[X++], Ch, Color);
+                        L++;
                         P++;
                         chars = bufChars(P);
                         Ch = chars[0];
                         if (Ch == '\r' || Ch == '\n') {
-                            while (X < Width)
-                            ::setCell(Cells[X++], ' ', Color);
+                            while (X < Width) {
+                                shadowCopy.push_back(Color);
+                                ::setCell(Cells[X++], ' ', Color);
+                            }
+                            shadowData[cursor.y] = L;
                             P++;
+                            L = 1;
                             break;
                         }
                     }   while (X < Width);
@@ -340,25 +425,32 @@ void TSyntaxFileEditor::formatLine(
             if (Ch == '\r' || Ch == '\n') {
                 Color = EditorCommentColor;
             
-                while (X < Width)
-                ::setCell(Cells[X++], ' ', Color);
+                while (X < Width) {
+                    shadowCopy.push_back(Color);
+                    ::setCell(Cells[X++], ' ', Color);
+                    L++;
+                }
                 P++;
                 break;
             }   else {
                 Color = EditorTextColor;
-            
+                shadowCopy.push_back(Color);
+
                 ::setCell(Cells[X], Ch, Color);
                 X++;
                 P++;
+                L++;
                 if (P >= bufLen || X >= Width) break;
             }
         }   else
         if (Ch == '/') {
             Color = EditorTextColor;
+            shadowCopy.push_back(Color);
         
             ::setCell(Cells[X], '/', Color);
             X++;
             P++;
+            L++;
             chars = bufChars(P);
             Ch = chars[0];
             if (P >= bufLen || X >= Width) break;
@@ -369,17 +461,23 @@ void TSyntaxFileEditor::formatLine(
             if (Ch == '/') {
                 tokenIsComment = true;
                 Color = EditorCommentColor;
-            
+
                 ::setCell(Cells[X-1], Ch, Color);
                 if (X < Width) {
                     do  {
+                        shadowCopy.push_back(Color);
                         ::setCell(Cells[X++], Ch, Color);
+                        L++;
                         P++;
                         chars = bufChars(P);
                         Ch = chars[0];
                         if (Ch == '\r' || Ch == '\n') {
-                            while (X < Width)
-                            ::setCell(Cells[X++], ' ', Color);
+                            while (X < Width) {
+                                shadowCopy.push_back(Color);
+                                ::setCell(Cells[X++], ' ', Color);
+                            }
+                            shadowData[cursor.y] = L;
+                            L = 1;
                             P++;
                             break;
                         }
@@ -393,10 +491,13 @@ void TSyntaxFileEditor::formatLine(
             // ----------------------------
             if (Ch == '*') {
                 tokenIsComment = true;
+
                 Color = EditorCommentColor;
+                shadowCopy.push_back(Color);
 
                 ::setCell(Cells[X-1], '/', Color);
                 ::setCell(Cells[X  ], '*', Color);
+                L++;
                 X++;
                 P++;
                 while (1) {
@@ -405,8 +506,10 @@ void TSyntaxFileEditor::formatLine(
                     Ch = chars[0];
                     if (Ch == '*') {
                         Color = EditorCommentColor;
+                        shadowCopy.push_back(Color);
                     
                         ::setCell(Cells[X], '*', Color);
+                        L++;
                         X++;
                         P++;
                         if (P >= bufLen || X >= Width) break;
@@ -418,17 +521,22 @@ void TSyntaxFileEditor::formatLine(
                             ::setCell(Cells[X], Ch, Color);
                             tokenIsComment = false;
                             Color = EditorTextColor;
+                            L++;
                             X++;
                             P++;
                             break;
                         }   else
                         if (Ch == '\r' || Ch == '\n') {
-                            while (X < Width)
-                            ::setCell(Cells[X++], ' ', Color);
+                            while (X < Width) {
+                                ::setCell(Cells[X++], ' ', Color);
+                            }
+                            shadowData[cursor.y] = L;
+                            L = 1;
                             P++;
                             break;
                         }   else {
                             ::setCell(Cells[X], Ch, Color);
+                            L++;
                             X++;
                             P++;
                             if (P >= bufLen || X >= Width) break;
@@ -436,15 +544,22 @@ void TSyntaxFileEditor::formatLine(
                     }   else
                     if (Ch == '\r' || Ch == '\n') {
                         Color = EditorCommentColor;
+                        shadowCopy.push_back(Color);
         
-                        while (X < Width)
-                        ::setCell(Cells[X++], ' ', Color);
+                        while (X < Width) {
+                            ::setCell(Cells[X++], ' ', Color);
+                            L++;
+                        }
+                        shadowData[cursor.y] = L;
+                        L = 1;
                         P++;
                         if (P >= bufLen || X >= Width) break;
                     }   else {
                         Color = EditorCommentColor;
+                        shadowCopy.push_back(Color);
                     
                         ::setCell(Cells[X], Ch, Color);
+                        L++;
                         X++;
                         P++;
                         if (P >= bufLen || X >= Width) break;
@@ -452,8 +567,10 @@ void TSyntaxFileEditor::formatLine(
                 }
             }   else {
                 Color = EditorTextColor;
+                shadowCopy.push_back(Color);
         
                 ::setCell(Cells[X], Ch, Color);
+                L++;
                 X++;
                 P++;
                 if (P >= bufLen || X >= Width) break;
@@ -461,12 +578,14 @@ void TSyntaxFileEditor::formatLine(
         }   else
         if (Ch == '(') {
             Color = EditorTextColor;
+            shadowCopy.push_back(Color);
         
             ::setCell(Cells[X], '(', Color);
+            L++;
             X++;
             P++;
             chars = bufChars(P);
-            Ch = chars[0];
+            Ch    = chars[0];
             if (P >= bufLen || X >= Width) break;
             
             // ----------------------------
@@ -475,9 +594,11 @@ void TSyntaxFileEditor::formatLine(
             if (Ch == '*') {
                 tokenIsComment = true;
                 Color = EditorCommentColor;
+                shadowCopy.push_back(Color);
 
                 ::setCell(Cells[X-1], '(', Color);
                 ::setCell(Cells[X  ], '*', Color);
+                L++;
                 X++;
                 P++;
                 while (1) {
@@ -486,6 +607,7 @@ void TSyntaxFileEditor::formatLine(
                     Ch = chars[0];
                     if (Ch == '*') {
                         ::setCell(Cells[X], '*', Color);
+                        L++;
                         X++;
                         P++;
                         if (P >= bufLen || X >= Width) break;
@@ -495,17 +617,23 @@ void TSyntaxFileEditor::formatLine(
                             ::setCell(Cells[X], Ch, Color);
                             tokenIsComment = false;
                             Color = EditorTextColor;
+                            shadowCopy.push_back(Color);
+                            L++;
                             X++;
                             P++;
                             break;
                         }   else
                         if (Ch == '\r' || Ch == '\n') {
-                            while (X < Width)
-                            ::setCell(Cells[X++], ' ', Color);
+                            while (X < Width) {
+                                ::setCell(Cells[X++], ' ', Color);
+                            }
+                            shadowData[cursor.y] = L;
+                            L = 1;
                             P++;
                             break;
                         }   else {
                             ::setCell(Cells[X], Ch, Color);
+                            L++;
                             X++;
                             P++;
                             if (P >= bufLen || X >= Width) break;
@@ -513,15 +641,21 @@ void TSyntaxFileEditor::formatLine(
                     }   else
                     if (Ch == '\r' || Ch == '\n') {
                         Color = EditorCommentColor;
+                        shadowCopy.push_back(Color);
                     
-                        while (X < Width)
-                        ::setCell(Cells[X++], ' ', Color);
+                        while (X < Width) {
+                            ::setCell(Cells[X++], ' ', Color);
+                        }
+                        shadowData[cursor.y] = L;
+                        L = 1;
                         P++;
                         if (P >= bufLen || X >= Width) break;
                     }   else {
                         Color = EditorCommentColor;
+                        shadowCopy.push_back(Color);
                     
                         ::setCell(Cells[X], Ch, Color);
+                        L++;
                         X++;
                         P++;
                         if (P >= bufLen || X >= Width) break;
@@ -529,8 +663,10 @@ void TSyntaxFileEditor::formatLine(
                 }
             }   else {
                 Color = EditorTextColor;
+                shadowCopy.push_back(Color);
             
                 ::setCell(Cells[X], Ch, Color);
+                L++;
                 X++;
                 P++;
                 if (P >= bufLen || X >= Width) break;
@@ -541,7 +677,10 @@ void TSyntaxFileEditor::formatLine(
             Color = EditorCommentColor; else
             Color = EditorTextColor;
         
+            shadowCopy.push_back(Color);
+
             ::setCell(Cells[X], '*', Color);
+            L++;
             X++;
             P++;
             if (P >= bufLen || X >= Width) break;
@@ -554,19 +693,26 @@ void TSyntaxFileEditor::formatLine(
             if (Ch == '*') {
                 tokenIsComment = true;
                 Color = EditorCommentColor;
+                shadowCopy.push_back(Color);
             
                 ::setCell(Cells[X-1], Ch, Color);
                 if (X < Width) {
                     do  {
                         Color = EditorCommentColor;
+                        shadowCopy.push_back(Color);
                     
                         ::setCell(Cells[X++], Ch, Color);
+                        L++;
                         P++;
                         chars = bufChars(P);
                         Ch = chars[0];
                         if (Ch == '\r' || Ch == '\n') {
-                            while (X < Width)
-                            ::setCell(Cells[X++], ' ', Color);
+                            while (X < Width) {
+                                shadowCopy.push_back(Color);
+                                ::setCell(Cells[X++], ' ', Color);
+                            }
+                            shadowData[cursor.y] = L;
+                            L = 1;
                             P++;
                             break;
                         }
@@ -581,8 +727,10 @@ void TSyntaxFileEditor::formatLine(
             if (Ch == '/') {
                 tokenIsComment = false;
                 Color = EditorCommentColor;
+                shadowCopy.push_back(Color);
                 
                 ::setCell(Cells[X], '/', Color);
+                L++;
                 X++;
                 P++;
                 if (P >= bufLen || X >= Width) break;
@@ -594,15 +742,19 @@ void TSyntaxFileEditor::formatLine(
             if (Ch == ')') {
                 tokenIsComment = false;
                 Color = EditorCommentColor;
+                shadowCopy.push_back(Color);
 
                 ::setCell(Cells[X], ')', Color);
+                L++;
                 X++;
                 P++;
                 if (P >= bufLen || X >= Width) break;
             }   else {
                 Color = EditorCommentColor;
+                shadowCopy.push_back(Color);
             
                 ::setCell(Cells[X], '*', Color);
+                L++;
                 X++;
                 P++;
                 if (P >= bufLen || X >= Width) break;
@@ -611,9 +763,13 @@ void TSyntaxFileEditor::formatLine(
         if (Ch == '\r' || Ch == '\n') {
             tokenIsComment = false;
             Color = EditorTextColor;
+            shadowCopy.push_back(Color);
         
-            while (X < Width)
-            ::setCell(Cells[X++], ' ', Color);
+            while (X < Width) {
+                ::setCell(Cells[X++], ' ', Color);
+            }
+            shadowData[cursor.y] = L;
+            L = 1;
             P++;
             break;
         }   else
@@ -621,10 +777,13 @@ void TSyntaxFileEditor::formatLine(
             if (tokenIsComment)
             Color = EditorCommentColor; else
             Color = EditorTextColor;
-        
+
+            shadowCopy.push_back(Color);
+
             if (X < Width) {
                 do {
                     ::setCell(Cells[X++], ' ', Color);
+                    L++;
                 }   while (X%8 != 0 && X < Width);
                 ++P;
             }   else break;
@@ -633,6 +792,8 @@ void TSyntaxFileEditor::formatLine(
             Color = EditorCommentColor; else
             Color = EditorTextColor;
 
+            shadowCopy.push_back(Color);
+
             if (!formatCell(Cells, (uint&) X, chars, P, Color))
             break;
         }
@@ -640,8 +801,10 @@ void TSyntaxFileEditor::formatLine(
     
     Color = EditorTextColor;
 
-    while (X < Width)
-    ::setCell(Cells[X++], ' ', Color);
+    while (X < Width) {
+        shadowCopy.push_back(Color);
+        ::setCell(Cells[X++], ' ', Color);
+    }
 }
 
 // -----------------------------------------------------------------
@@ -661,3 +824,13 @@ std::string TSyntaxFileEditor::getWordUnderCursor() {
     
     return word;
 }
+
+#if 0
+TColorAttr
+TSyntaxFileEditor::mapColor(uchar index) noexcept {
+    switch (index) {
+        case 1: return {0xffff00, 0x008000};
+        default: return errorAttr;
+    }
+}
+#endif
