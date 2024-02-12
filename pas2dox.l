@@ -202,13 +202,22 @@ extern void TurboMain(int,char**);
 extern ushort doEditDialog( int dialog, ... );
 extern ushort execDialog( TDialog *d, void *data );
 
+std::string input_file;
+
 // ---------------------------------------------------------------------------
 // sanity check of some (pre) defined macros ...
 // ---------------------------------------------------------------------------
-#ifndef  EXIT_FAILURE
+# undef EXIT_FAILURE
+# undef EXIT_SUCCESS
+
 # define EXIT_FAILURE 1
 # define EXIT_SUCCESS 0
-#endif
+
+# undef EOL
+# undef EOF
+
+# define EOL(c) ((c == '\n') || (c == '\r'))
+# define EOF(c) ((c == '\0') || (c == -1))
 
 // ---------------------------------------------------------------------------
 // exception class, to reduce use size of code - instead conditional
@@ -490,22 +499,19 @@ public:
         {
             TSyntaxFileEditor::handleEvent( event );
             if (event.what == evKeyDown) {
-                if (event.keyDown.charScan.charCode == kbEsc)     // #27 - Escape
-                {
-                    owner->close();
+                if (event.keyDown.keyCode == kbCtrlS) {
                     clearEvent(event);
+                    messageBox("ctrl + s",mfInformation|mfOKButton);
                     return;
                 }   else
-                if (event.keyDown.keyCode == kbF1)  // F1
-                {
+                if (event.keyDown.keyCode == kbCtrlO) {
                     clearEvent(event);
-                    messageBox("getkey F1",mfInformation|mfOKButton);
+                    messageBox("ctrl + O",mfInformation|mfOKButton);
                     return;
                 }   else
-                if (event.keyDown.keyCode == kbF9)  // F9
-                {
+                if (event.keyDown.keyCode == kbF2) {
                     clearEvent(event);
-                    messageBox("getkey F9",mfInformation|mfOKButton);
+                    messageBox("F2222",mfInformation|mfOKButton);
                     return;
                 }
             }   else
@@ -539,7 +545,7 @@ public:
             hScrollBar,
             vScrollBar,
             indicator,
-            "www.txt"));
+            input_file.c_str()));
 
         insert(button1 = new TMyButton(TRect(size.x - 21, 2, size.x - 3, 4), "Start",   cmButton1, bfNormal));
         insert(button2 = new TMyButton(TRect(size.x - 21, 5, size.x - 3, 7), "Compile", cmButton2, bfNormal));
@@ -899,8 +905,11 @@ void TFormApp::handleEvent(TEvent& event)
         if (event.keyDown.keyCode == kbF2)  // F2
         {
             clearEvent(event);
-            messageBox("getkey F2",mfInformation|mfOKButton);
-            messageBox("huhu", mfInformation|mfOKButton);
+            
+            messageBox("compile...", mfInformation|mfOKButton);
+            yyout = OUTPUT;
+            yylex();
+            
             return;
         }
     }
@@ -1876,7 +1885,7 @@ void ChangeStrings(void)
 		result = WideCharToMultiByte(CP_UTF8, 0, wcs, 1, buf, max_size, NULL, NULL);\
 	}\
 	else\
-	 result = (c == EOF) ? YY_NULL : (buf[0] = c, 1); \
+	 result = ((c == '\0') || (c == -1)) ? YY_NULL : (buf[0] = c, 1); \
 	 }
 %}
 
@@ -4373,18 +4382,24 @@ void version_info(void)
 // ---------------------------------------------------------------------------
 // open the input, and output file. output file becomes .cpp
 // ---------------------------------------------------------------------------
-void cc_file_output( std::string name)
+void cc_file_output( std::string name )
 {
-    cout << "==> Transpile "
-         << name << " to: "
-         << name << ".cpp"
-         << endl;
+    if (!g_bTextUserInterface) {
+        cout << "==> Transpile "
+             << name << " to: "
+             << name << ".cpp"
+             << endl;
+    }
 
     yyin = fopen(name.c_str(), "r");
     
     if (yyin == NULL) {
         stringstream ss;
         ss << "Filename " << name << " Not Found.";
+        if (g_bTextUserInterface) {
+            messageBox(ss.str().c_str(),mfError|mfOKButton);
+            return;
+        }   else
         throw EP_Exception_ExitFailure( ss.str().c_str() );
     }
     
@@ -4785,7 +4800,7 @@ int main (int argc, char** argv)
     // ----------------------------------
     myini.setMultiLineValues(true);
     myini.load(ApplicationIniFile);
- 
+     
     // ----------------------------------
     // initialize logging stuff ...
     // ----------------------------------
@@ -4867,6 +4882,14 @@ int main (int argc, char** argv)
     init_asmjit ();
 
     if (g_bTextUserInterface) {
+        input_file = myini["common"]["input"].as<std::string>();
+        if (input_file.size() < 3) {
+            std::stringstream ss;
+            ss << "error: input file must have minimal 2 characters"
+               << std::endl;
+            std::cerr << ss.str();
+            return (g_bExitCode = EXIT_FAILURE);
+        }
         g_pTextUserInterface( argc, argv );
     }   else {
         yyout = OUTPUT;

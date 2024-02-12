@@ -88,6 +88,7 @@ TSyntaxFileEditor::TSyntaxFileEditor(
 // -------------------------------
 void TSyntaxFileEditor::handleEvent( TEvent &event )
 {
+#if 0
     int flag = 0;
     int  pos = 0;
 
@@ -97,7 +98,7 @@ void TSyntaxFileEditor::handleEvent( TEvent &event )
     
     static uint P = 0;
     char   Ch;
-    
+
     if (event.what == evKeyDown)
     {
         while (1) {
@@ -245,12 +246,8 @@ void TSyntaxFileEditor::handleEvent( TEvent &event )
             }
 */
         }   else
-        if (event.keyDown.keyCode == kbCtrlS) {
-            clearEvent(event);
-            messageBox("ctrl + s",mfInformation|mfOKButton);
-            return;
-        }
     }
+#endif
 
     TFileEditor::handleEvent( event );
 }

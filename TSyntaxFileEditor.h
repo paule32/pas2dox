@@ -54,15 +54,6 @@
 # include <map>
 
 // -----------------------------------------------------------------
-// sanity checks of used old school C macros ...
-// -----------------------------------------------------------------
-# undef EOL
-# undef EOF
-
-# define EOL(c) ((c == '\n') || (c == '\r'))
-# define EOF(c) ((c == '\0') || (c == -1))
-
-// -----------------------------------------------------------------
 // this is our "syntax type" enum class to describe the highlighter
 // -----------------------------------------------------------------
 enum class TSyntaxLanguageType : unsigned char {
